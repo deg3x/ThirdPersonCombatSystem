@@ -6,6 +6,8 @@ The idea was to create a third person combat system, focusing on smooth player f
 ## Basic Features
 * Third person movement and camera
 * Player attack mechanic
+* Health system with corresponding UI
+* Enemy combat dummy
 
 ## Smoothness Features
 * Camera smooth extends transitions
@@ -13,15 +15,23 @@ The idea was to create a third person combat system, focusing on smooth player f
 * Camera auto-center upon inactivity
 * Player snap-to-enemy mechanic upon attacking
 * Player movement acceleration/deceleration
-* Player sprinting
+* Player sprinting with FOV transition
 * Custom animation montage syncing
 * Animation momentary slow down upon succesful hit
 
+## TO-DO
+* Build basic enemy AI Behavior (in progress)
+* Expand on player skills and behavior (based on the existing assets)
+* Create different types of enemies
+* Make player mesh rotation smoother
+* Improve controller support
+* Add game settings
+
 ## Assets Used
 I've implemented all the code on my own so there are no third party references when it comes to that.\
-When it comes to art assets I have used:
-* Khaimera model and animations (Epic Games)
-* Grux model and animations (Epic Games)
+For the 3D/art assets, I have used:
+* Khaimera pack (Epic Games)
+* Grux pack (Epic Games)
 
 ## Latest Build
 The latest version of the (stable) compressed build can be found at:\
