@@ -11,8 +11,12 @@ struct FEnemyAnimProperties
 {
 	GENERATED_BODY()
 
-	bool IsMoving;
+	UPROPERTY(BlueprintReadOnly, Category = "Animation State")
+	bool IsDead;
 };
+
+class UTPPHealthComponent;
+class UTPWidgetToCameraComponent;
 
 UCLASS()
 class THIRDPERSON_API ATPEnemyBase : public ACharacter
@@ -32,13 +36,28 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Animation")
 	UAnimMontage* TakeHitMontage;
 
+	UPROPERTY(EditAnywhere, Category = "UI")
+	UTPWidgetToCameraComponent* HealthWidgetComponent;
+
+	UPROPERTY(Editanywhere, Category = "Stats")
+	UTPPHealthComponent* HealthComponent;
+
 	UAnimInstance* AnimInstance;
+	FTimerHandle IntroTimerHandle;
 
 public:
 	ATPEnemyBase();
 
 protected:
 	virtual void BeginPlay() override;
+
+	UFUNCTION()
+	void StartBehaviorTree();
+
+	void StopBehaviorTree(FString Reason);
+
+	UFUNCTION()
+	void OnHealthChanged(UTPPHealthComponent* HealthComp, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
 
 public:	
 	virtual void Tick(float DeltaTime) override;
@@ -47,4 +66,9 @@ public:
 	void FinishWaitingForPlayer();
 	void GetHitFromSide(FVector PlayerForward);
 	void PlayTakeHitSection(int32 SectionID);
+	void ShowHealthUI();
+	void HideHealthUI();
+	void InitHealthUI();
+	void UpdateHealthUI(float CurrentHealth);
+	void FullyHeal();
 };

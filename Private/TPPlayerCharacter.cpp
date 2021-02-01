@@ -10,8 +10,10 @@
 #include "GameFramework\CharacterMovementComponent.h"
 #include "Animation\AnimInstance.h"
 #include "Animation\AnimNode_StateMachine.h"
+#include "Kismet\GameplayStatics.h"
 #include "TimerManager.h"
 #include "TPEnemyBase.h"
+#include "TPPHealthComponent.h"
 
 ATPPlayerCharacter::ATPPlayerCharacter()
 {
@@ -23,6 +25,8 @@ ATPPlayerCharacter::ATPPlayerCharacter()
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	CameraComponent->SetupAttachment(SpringArmComponent);
 	CameraComponent->SetFieldOfView(CameraFOVDefault);
+
+	HealthComponent = CreateDefaultSubobject<UTPPHealthComponent>(TEXT("HealthComponent"));
 
 	WeaponRightBoxComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("WeaponRightBoxComponent"));
 	WeaponRightBoxComponent->SetupAttachment(GetMesh(), FName(TEXT("Weapon_Collider_R")));
@@ -51,7 +55,7 @@ ATPPlayerCharacter::ATPPlayerCharacter()
 	LastMovementVector = FVector::ZeroVector;
 	MeshToMovementRotator = FRotator::ZeroRotator;
 	MovementMode = EPlayerMovementMode::Travelling;
-	CurrentEnemyBoss = nullptr;
+	CurrentSelectedEnemy = nullptr;
 	IsCombatCameraEnabled = false;
 	IsInitiatingAttack = false;
 	IsSnappingMovement = false;
@@ -133,7 +137,7 @@ void ATPPlayerCharacter::MovePlayerCombat(float DeltaTime)
 	LastInputAxis = FVector::ZeroVector;
 	LastMovementVector = FVector::ZeroVector;
 
-	if (CurrentEnemyBoss == nullptr)
+	if (CurrentSelectedEnemy == nullptr)
 	{
 		// What to do here?
 	}
@@ -150,7 +154,7 @@ void ATPPlayerCharacter::MovePlayerCombat(float DeltaTime)
 		CameraForward.Z = 0.0f;
 		CameraForward.Normalize();
 		
-		FVector CameraToEnemy = CurrentEnemyBoss->GetActorLocation() - CameraComponent->GetComponentLocation();
+		FVector CameraToEnemy = CurrentSelectedEnemy->GetActorLocation() - CameraComponent->GetComponentLocation();
 		CameraToEnemy.Z = 0.0f;
 		CameraToEnemy.Normalize();
 
@@ -162,7 +166,7 @@ void ATPPlayerCharacter::MovePlayerCombat(float DeltaTime)
 			return;
 		}
 
-		FVector EnemyLocation = CurrentEnemyBoss->GetActorLocation();
+		FVector EnemyLocation = CurrentSelectedEnemy->GetActorLocation();
 		FVector DirectionToEnemy = EnemyLocation - GetActorLocation();
 		float DistanceToEnemy = DirectionToEnemy.Size();
 		
@@ -174,7 +178,7 @@ void ATPPlayerCharacter::MovePlayerCombat(float DeltaTime)
 
 		AlignMeshToAttackTarget(DeltaTime);
 
-		float CloseDistanceLimit = GetCapsuleComponent()->GetScaledCapsuleRadius() + CurrentEnemyBoss->GetCapsuleComponent()->GetScaledCapsuleRadius();
+		float CloseDistanceLimit = GetCapsuleComponent()->GetScaledCapsuleRadius() + CurrentSelectedEnemy->GetCapsuleComponent()->GetScaledCapsuleRadius();
 		CloseDistanceLimit += 280.0f;
 		CloseDistanceLimit /= 2.0f;
 
@@ -241,7 +245,7 @@ void ATPPlayerCharacter::UpdateCameraValues() const
 		SpringArmComponent->UpdateIsUsingController(false);
 	}
 	SpringArmComponent->UpdateCombatModeEnabled(IsCombatCameraEnabled);
-	SpringArmComponent->UpdateCombatTarget(CurrentEnemyBoss);
+	SpringArmComponent->UpdateCombatTarget(CurrentSelectedEnemy);
 	SpringArmComponent->UpdatePlayerForward(GetMeshForwardVector());
 	SpringArmComponent->UpdateAutoCenterEnabled(IsCameraAutoCenterEnabled);
 }
@@ -311,7 +315,7 @@ void ATPPlayerCharacter::AlignMeshToMovementAndLookDirection(float DeltaTime)
 void ATPPlayerCharacter::AlignMeshToAttackTarget(float DeltaTime)
 {
 	FVector ForwardVector = GetMesh()->GetRightVector();
-	FVector TargetForward = CurrentEnemyBoss->GetActorLocation() - GetActorLocation();
+	FVector TargetForward = CurrentSelectedEnemy->GetActorLocation() - GetActorLocation();
 	TargetForward.Normalize();
 
 	float Angle = FMath::Acos(FVector::DotProduct(ForwardVector, TargetForward)) * 180.0f / PI;
@@ -447,7 +451,7 @@ void ATPPlayerCharacter::HandlePlayerAttack()
 					CanCacheAttack = false;
 					PlayAttackResetMontage(SectionIndex);
 				}
-				UE_LOG(LogTemp, Warning, TEXT("Has cached attack: %d"), RunningMontage->GetNextSectionID(SectionIndex));
+
 				if (HasCachedAttack)
 				{
 					HasCachedAttack = false;
@@ -603,6 +607,11 @@ void ATPPlayerCharacter::CheckForEnemyHit(bool IsLeftHit)
 
 		PauseMontageOnHit();
 		LeftAxeOverlapEnemy->GetHitFromSide(GetMeshForwardVector());
+		UGameplayStatics::ApplyDamage(LeftAxeOverlapEnemy, WeaponDamage, GetController(), this, DamageType);
+		if (SuccessfulHitFX)
+		{
+			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SuccessfulHitFX, WeaponLeftBoxComponent->GetComponentLocation());
+		}
 	}
 	else
 	{
@@ -613,6 +622,11 @@ void ATPPlayerCharacter::CheckForEnemyHit(bool IsLeftHit)
 
 		PauseMontageOnHit();
 		RightAxeOverlapEnemy->GetHitFromSide(GetMeshForwardVector());
+		UGameplayStatics::ApplyDamage(RightAxeOverlapEnemy, WeaponDamage, GetController(), this, DamageType);
+		if (SuccessfulHitFX)
+		{
+			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SuccessfulHitFX, WeaponRightBoxComponent->GetComponentLocation());
+		}
 	}
 }
 
@@ -646,7 +660,7 @@ void ATPPlayerCharacter::BindAxeDelegates()
 
 void ATPPlayerCharacter::SetCurrentEnemyBoss(ATPEnemyBase* Boss)
 {
-	CurrentEnemyBoss = Boss;
+	CurrentSelectedEnemy = Boss;
 }
 
 void ATPPlayerCharacter::SetCombatCameraEnabled(bool IsEnabled)
@@ -684,12 +698,20 @@ void ATPPlayerCharacter::CheckSetCameraAutoCenterEnabled()
 		IsCameraAutoCenterEnabled = true;
 	}
 
-	if (IsCombatCameraEnabled && CurrentEnemyBoss != nullptr)
+	if (IsCombatCameraEnabled && CurrentSelectedEnemy != nullptr)
 	{
 		if (CameraInactivityTimer > 0.3f)
 		{
 			IsCameraAutoCenterEnabled = true;
 		}
+	}
+}
+
+void ATPPlayerCharacter::CheckActiveEnemyKilled(ATPEnemyBase* KilledEnemy)
+{
+	if (KilledEnemy == CurrentSelectedEnemy)
+	{
+		CurrentSelectedEnemy = nullptr;
 	}
 }
 

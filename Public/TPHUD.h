@@ -13,7 +13,7 @@ UCLASS()
 class THIRDPERSON_API ATPHUD : public AHUD
 {
 	GENERATED_BODY()
-	
+
 public:
 	ATPHUD();
 

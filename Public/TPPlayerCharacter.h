@@ -11,6 +11,7 @@ class USpringArmComponent;
 class UTPSpringArmComponent;
 class UBoxComponent;
 class ATPEnemyBase;
+class UTPPHealthComponent;
 
 UENUM(BlueprintType)
 enum class EMovementDirection : uint8
@@ -58,6 +59,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	UBoxComponent* WeaponLeftBoxComponent;
 
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	UTPPHealthComponent* HealthComponent;
+
 	UPROPERTY(EditAnywhere, Category = "Camera Settings")
 	float CameraFOVDefault = 85.0f;
 
@@ -92,6 +96,12 @@ protected:
 	float RotationSmoothness = 1.3f;
 
 	UPROPERTY(EditAnywhere, Category = "Combat Variables")
+	float WeaponDamage = 15.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Combat Variables")
+	TSubclassOf<UDamageType> DamageType;
+
+	UPROPERTY(EditAnywhere, Category = "Combat Variables")
 	float HitAnimationDelay = 0.085f;
 
 	UPROPERTY(EditAnywhere, Category = "Combat Variables")
@@ -108,6 +118,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Combat Variables")
 	float CameraToEnemyMaxAngleToSnap = 40.0f;
+
+	UPROPERTY(EditAnywhere, Category = "VFX")
+	UParticleSystem* SuccessfulHitFX;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Animation Variables")
 	FAnimProperties AnimationVariables;
@@ -152,7 +165,7 @@ protected:
 	FTimerHandle HitDelayTimerHandle;
 	ATPEnemyBase* LeftAxeOverlapEnemy;
 	ATPEnemyBase* RightAxeOverlapEnemy;
-	ATPEnemyBase* CurrentEnemyBoss;
+	ATPEnemyBase* CurrentSelectedEnemy;
 
 public:
 	ATPPlayerCharacter();
@@ -201,4 +214,5 @@ public:
 	void CheckForEnemyHit(bool IsLeftHit);
 	void SetCurrentEnemyBoss(ATPEnemyBase* Boss);
 	void SetCombatCameraEnabled(bool IsEnabled);
+	void CheckActiveEnemyKilled(ATPEnemyBase* KilledEnemy);
 };

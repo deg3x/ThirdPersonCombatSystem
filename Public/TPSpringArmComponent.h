@@ -34,7 +34,7 @@ protected:
 	float CameraCombatSensitivityController = 50.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Camera Settings")
-	float CameraPitchLimitPos = 35.0f;
+	float CameraPitchLimitPos = 40.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Camera Settings")
 	float CameraPitchLimitNeg = -50.0f;
@@ -60,11 +60,15 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Camera Settings")
 	float AutoCenterSpeed = 40.0f;
 
+	UPROPERTY(EditAnywhere, Category = "Camera Settings")
+	float AutoCenterSmoothZoneDeg = 20.0f;
+
 	float XAxisValue;
 	float YAxisValue;
 	float PitchSmoothenFactor;
 	float CameraSensitivity;
 	float CameraSensitivityCombat;
+	float LastYawOffsetAngle;
 
 	bool IsCombatModeEnabled;
 	bool IsAutoCenterEnabled;

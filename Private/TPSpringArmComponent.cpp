@@ -70,8 +70,6 @@ void UTPSpringArmComponent::RotateCameraBoomBasedOnEnemy(float DeltaTime)
 		Direction = 0.0f;
 	}
 
-	float EnemyFollowSpeed = Angle * 2.0f;
-
 	float CameraYaw = XAxisValue * (CameraInvertX ? -1.0f : 1.0f);
 	float CameraPitch = YAxisValue * (CameraInvertY ? -1.0f : 1.0f);
 
@@ -85,11 +83,14 @@ void UTPSpringArmComponent::RotateCameraBoomBasedOnEnemy(float DeltaTime)
 		YawSmoothness = 1.0f - FMath::Lerp(0.0f, 1.0f, -(Angle / CameraYawLimitCombatNeg));
 	}
 
+	YawSmoothness = FMath::Clamp(YawSmoothness, 0.1f, 1.0f);
+
 	float CombatOffsetYawAmount = CameraYaw * DeltaTime * CameraSensitivityCombat * YawSmoothness;
 
-	FRotator NewCameraRotation = GetRelativeRotation();
+	float EnemyFollowSpeed = Angle * 5.0f;
 	float RotationAmount = EnemyFollowSpeed * DeltaTime * Direction;
 
+	FRotator NewCameraRotation = GetRelativeRotation();
 	NewCameraRotation.Pitch = FMath::ClampAngle(NewCameraRotation.Pitch + CameraPitch * CameraSensitivityCombat * DeltaTime, CameraPitchLimitCombatNeg, CameraPitchLimitCombatPos);
 	NewCameraRotation.Yaw += RotationAmount + CombatOffsetYawAmount;
 	
@@ -98,36 +99,38 @@ void UTPSpringArmComponent::RotateCameraBoomBasedOnEnemy(float DeltaTime)
 
 void UTPSpringArmComponent::RotateCameraBoomAutoCenter(float DeltaTime)
 {
-	RotateCameraBoomAutoCenterPitch(DeltaTime);
 	RotateCameraBoomAutoCenterYaw(DeltaTime);
+	RotateCameraBoomAutoCenterPitch(DeltaTime);
 }
 
 void UTPSpringArmComponent::RotateCameraBoomAutoCenterPitch(float DeltaTime)
 {
-	FVector CameraBoomForward = GetForwardVector();
-	if (CameraBoomForward.Y > CameraBoomForward.X)
-	{
-		CameraBoomForward.Y = CameraBoomForward.Y + CameraBoomForward.X;
-		CameraBoomForward.X = CameraBoomForward.Y - CameraBoomForward.X;
-		CameraBoomForward.Y = CameraBoomForward.Y - CameraBoomForward.X;
-	}
-	CameraBoomForward.Y = 0.0f;
-	CameraBoomForward.X = FMath::Abs(CameraBoomForward.X);
-	CameraBoomForward.Normalize();
-
 	FVector TargetForward = FVector::ForwardVector;
+	FVector ForwardPitchOffset = TargetForward + GetForwardVector().Z;
+	ForwardPitchOffset.Normalize();
 
-	float Angle = FMath::Acos(FVector::DotProduct(CameraBoomForward, TargetForward)) * 180.0f / PI;
-	float Direction = FVector::CrossProduct(CameraBoomForward, TargetForward).Y < 0.0f ? 1.0 : -1.0f;
+	float Angle = FMath::Acos(FVector::DotProduct(ForwardPitchOffset, TargetForward)) * 180.0f / PI;
+	float Direction = FVector::CrossProduct(ForwardPitchOffset, TargetForward).Y < 0.0f ? 1.0 : -1.0f;
 
-	if (Angle < 5.0f)
+	if (Angle < 1.0f)
 	{
 		return;
 	}
 
 	FRotator NewCameraRotation = GetRelativeRotation();
 
-	NewCameraRotation.Pitch += AutoCenterSpeed * DeltaTime * Direction;
+	float PitchAutoCenterSpeed = AutoCenterSpeed;
+	if (LastYawOffsetAngle > Angle)
+	{
+		PitchAutoCenterSpeed *= Angle / LastYawOffsetAngle;
+	}
+
+	if (Angle < AutoCenterSmoothZoneDeg)
+	{
+		PitchAutoCenterSpeed = FMath::InterpEaseOut(0.0f, PitchAutoCenterSpeed, Angle / AutoCenterSmoothZoneDeg, 2);
+	}
+	
+	NewCameraRotation.Pitch += PitchAutoCenterSpeed * DeltaTime * Direction;
 
 	SetRelativeRotation(NewCameraRotation);
 }
@@ -145,14 +148,22 @@ void UTPSpringArmComponent::RotateCameraBoomAutoCenterYaw(float DeltaTime)
 	float Angle = FMath::Acos(FVector::DotProduct(CameraBoomForward, TargetForward)) * 180.0f / PI;
 	float Direction = FVector::CrossProduct(CameraBoomForward, TargetForward).Z > 0.0f ? 1.0 : -1.0f;
 
-	if (Angle < 5.0f)
+	LastYawOffsetAngle = Angle;
+
+	if (Angle < 1.0f)
 	{
 		return;
 	}
 
 	FRotator NewCameraRotation = GetRelativeRotation();
 
-	float RotationAmount = AutoCenterSpeed * DeltaTime * Direction;
+	float YawAutoCenterSpeed = AutoCenterSpeed;
+	if (Angle < AutoCenterSmoothZoneDeg)
+	{
+		YawAutoCenterSpeed = FMath::InterpEaseOut(0.0f, YawAutoCenterSpeed, Angle / AutoCenterSmoothZoneDeg, 2);
+	}
+
+	float RotationAmount = YawAutoCenterSpeed * DeltaTime * Direction;
 
 	NewCameraRotation.Yaw += RotationAmount;
 
@@ -204,7 +215,8 @@ void UTPSpringArmComponent::CalculateIsInSmoothZone()
 		if (IsInSmoothZone)
 		{
 			float Alpha = (CameraBoomRotation.Pitch - (PitchLimitPos - PitchLimitExtended)) / PitchLimitExtended;
-			PitchSmoothenFactor = FMath::Clamp(Alpha, 0.0f, 1.0f);
+			Alpha = FMath::Clamp(Alpha, 0.0f, 1.0f);
+			PitchSmoothenFactor = FMath::InterpEaseIn(0.0f, 1.0f, Alpha, 2);
 		}
 		else
 		{
@@ -218,7 +230,8 @@ void UTPSpringArmComponent::CalculateIsInSmoothZone()
 		if (IsInSmoothZone)
 		{
 			float Alpha = ((PitchLimitNeg + PitchLimitExtended) - CameraBoomRotation.Pitch) / PitchLimitExtended;
-			PitchSmoothenFactor = FMath::Clamp(Alpha, 0.0f, 1.0f);
+			Alpha = FMath::Clamp(Alpha, 0.0f, 1.0f);
+			PitchSmoothenFactor = FMath::InterpEaseIn(0.0f, 1.0f, Alpha, 2);
 		}
 		else
 		{
